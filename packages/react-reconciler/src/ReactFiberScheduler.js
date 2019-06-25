@@ -368,10 +368,19 @@ if (__DEV__ && replayFailedUnitOfWorkWithInvokeGuardedCallback) {
   };
 }
 
+/**
+ * 
+ *  打断更新
+ * 
+ */
 function resetStack() {
+  // nextUnitOfWork 指向下一个将要更新的节点
+  // 如果nextUnitOfWork !== null 则表明之前执行的是异步任务
+  // 并且由于时间片不够，将执行权归还给了JS
   if (nextUnitOfWork !== null) {
     let interruptedWork = nextUnitOfWork.return;
     while (interruptedWork !== null) {
+      // TODO 退回更新
       unwindInterruptedWork(interruptedWork);
       interruptedWork = interruptedWork.return;
     }
@@ -382,6 +391,7 @@ function resetStack() {
     checkThatStackIsEmpty();
   }
 
+  // 变为初始值
   nextRoot = null;
   nextRenderExpirationTime = NoWork;
   nextLatestAbsoluteTimeoutMs = -1;
@@ -1784,8 +1794,9 @@ function scheduleWorkToRoot(fiber: Fiber, expirationTime): FiberRoot | null {
   }
   return root;
 }
-
+// 任务调度入口
 function scheduleWork(fiber: Fiber, expirationTime: ExpirationTime) {
+  // 递归获取该Fiber的RootFiber
   const root = scheduleWorkToRoot(fiber, expirationTime);
   if (root === null) {
     if (__DEV__) {
@@ -1803,7 +1814,7 @@ function scheduleWork(fiber: Fiber, expirationTime: ExpirationTime) {
     }
     return;
   }
-
+  // 如果当前任务优先级更高，则可以打断。
   if (
     !isWorking &&
     nextRenderExpirationTime !== NoWork &&
@@ -1813,7 +1824,9 @@ function scheduleWork(fiber: Fiber, expirationTime: ExpirationTime) {
     interruptedBy = fiber;
     resetStack();
   }
+  // TODO 调和
   markPendingPriorityLevel(root, expirationTime);
+  // TODO working 阶段 和 commit阶段
   if (
     // If we're in the render phase, we don't need to schedule this root
     // for an update, because we'll do it before we exit...
@@ -1825,6 +1838,7 @@ function scheduleWork(fiber: Fiber, expirationTime: ExpirationTime) {
     const rootExpirationTime = root.expirationTime;
     requestWork(root, rootExpirationTime);
   }
+  // 出现嵌套更新时给出警告， NESTED_UPDATE_LIMIT 为 50
   if (nestedUpdateCount > NESTED_UPDATE_LIMIT) {
     // Reset this back to zero so subsequent updates don't throw.
     nestedUpdateCount = 0;
